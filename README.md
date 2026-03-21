@@ -1,9 +1,21 @@
-# AI Local Ollama (Mac Docker)
+# AI Local Ollama
 
-## 🚀 Quickstart
+## Quickstart
 ```bash
-git clone https://github.com/omar-mejia/ollama-ai-local.git && cd ollama-ai-local
 docker compose up -d
-./ai.sh --chat → llama3.2:3b (3GB)
-./ai.sh --code → deepseek-coder:6.7b (8GB)
-./ai.sh --level 2 → Chat+Code
+./ai.sh
+```
+
+## Usage
+```bash
+./ai.sh              # Select and pull models
+opencode -m ollama/<model>  # Use with opencode
+```
+
+## Workflow
+1. Start Docker: `docker compose up -d`
+2. Run `./ai.sh` to select and pull models
+3. Use `opencode -m ollama/llama3.2:3b` to chat with a model
+
+## API
+Ollama runs on `http://localhost:11434`.
