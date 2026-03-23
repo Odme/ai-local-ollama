@@ -1,15 +1,17 @@
-version: '3.8'
 services:
   ollama:
     image: ollama/ollama:latest
     container_name: ai-models
     ports:
-      - "11434:11434"
+      - "11434:11434"  # ✅ Puerto correcto
     volumes:
-      - ollama_data:/root/.ollama
+      - ollama_:/root/.ollama
     environment:
-      - OLLAMA_NUM_CTX=131072
+      - OLLAMA_HOST=0.0.0.0  # ✅ Accesible desde fuera del container
     restart: unless-stopped
-
+    # ✅ En Mac M4, Ollama ya usa Metal automáticamente dentro del container
+networks:
+  ai-network:
+    driver: bridge
 volumes:
-  ollama_data:
+  ollama_:
