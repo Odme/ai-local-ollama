@@ -14,7 +14,8 @@ CONTAINER_NAME="ai-models"
 OLLAMA_CMD="docker exec -it $CONTAINER_NAME ollama"
 
 # Available models
-MODEL_CHAT="llama3.1:70b-instruct-q4_K_M"
+MODEL_CHAT_FAST="llama3.1:8b-instruct-q8_0"
+MODEL_CHAT_DEEP="llama3.1:70b-instruct-q4_K_M"
 MODEL_CODE_FAST="phi4"
 MODEL_CODE_GENERAL="qwen2.5-coder:32b-q6_K"
 MODEL_THINK="deepseek-r1:32b"
@@ -73,9 +74,13 @@ load_models() {
     # Parse arguments
     for arg in "$@"; do
         case $arg in
-            --chat)
-                models_to_load+=("$MODEL_CHAT")
-                display_names+=("Chat (Llama 3.1 70B)")
+            --chat-fast)
+                models_to_load+=("$MODEL_CHAT_FAST")
+                display_names+=("Fast Chat (Llama 3.1 8B)")
+                ;;
+            --chat|--chat-deep)
+                models_to_load+=("$MODEL_CHAT_DEEP")
+                display_names+=("Deep Chat (Llama 3.1 70B)")
                 ;;
             --code-fast|--simple-code)
                 models_to_load+=("$MODEL_CODE_FAST")
@@ -90,8 +95,8 @@ load_models() {
                 display_names+=("Reasoning (DeepSeek R1)")
                 ;;
             --all)
-                models_to_load+=("$MODEL_CHAT" "$MODEL_CODE_FAST" "$MODEL_CODE_GENERAL" "$MODEL_THINK")
-                display_names+=("Chat (Llama 3.1 70B)" "Fast Code (Phi-4)" "General Code (Qwen 2.5 Coder 32B)" "Reasoning (DeepSeek R1)")
+                models_to_load+=("$MODEL_CHAT_FAST" "$MODEL_CHAT_DEEP" "$MODEL_CODE_FAST" "$MODEL_CODE_GENERAL" "$MODEL_THINK")
+                display_names+=("Fast Chat (Llama 3.1 8B)" "Deep Chat (Llama 3.1 70B)" "Fast Code (Phi-4)" "General Code (Qwen 2.5 Coder 32B)" "Reasoning (DeepSeek R1)")
                 ;;
             *)
                 print_error "Unknown option: $arg"
@@ -131,68 +136,87 @@ load_models() {
 show_interactive_menu() {
     echo ""
     echo -e "${BLUE}╔════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║   🤖  Select models to load                 ║${NC}"
+    echo -e "${BLUE}║   🤖  Select models to load               ║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════════╝${NC}"
     echo ""
     echo "Available options (separate multiple with comma):"
     echo ""
-    echo "   1. General Chat           (Llama 3.1 70B)"
-    echo "   2. Fast Code              (Phi-4)"
-    echo "   3. General Code           (Qwen 2.5 Coder 32B)"
-    echo "   4. Reasoning              (DeepSeek R1)"
-    echo "   5. All of the above"
+    echo "   1. Fast Chat              (Llama 3.1 8B)      ~9 GB"
+    echo "   2. Deep Chat              (Llama 3.1 70B)     ~42 GB"
+    echo "   3. Fast Code              (Phi-4)             ~16 GB"
+    echo "   4. General Code           (Qwen 2.5 Coder)    ~35 GB"
+    echo "   5. Reasoning              (DeepSeek R1)       ~28 GB"
+    echo "   6. All of the above"
     echo "   0. Exit"
     echo ""
-    echo -n "Select (e.g., 1,2 or 3,4 or 5): "
+    echo -n "Select (e.g., 1,3 or 2,4,5 or 6): "
     read -r selection
 
     case $selection in
         1)
-            load_models --chat
+            load_models --chat-fast
             ;;
         2)
-            load_models --code-fast
+            load_models --chat
             ;;
         3)
-            load_models --code
+            load_models --code-fast
             ;;
         4)
-            load_models --think
+            load_models --code
             ;;
         5)
+            load_models --think
+            ;;
+        6)
             load_models --all
             ;;
-        1,2|2,1)
-            load_models --chat --code-fast
-            ;;
         1,3|3,1)
-            load_models --chat --code
+            load_models --chat-fast --code-fast
             ;;
         1,4|4,1)
-            load_models --chat --think
+            load_models --chat-fast --code
+            ;;
+        1,5|5,1)
+            load_models --chat-fast --think
             ;;
         2,3|3,2)
-            load_models --code-fast --code
+            load_models --chat --code-fast
             ;;
         2,4|4,2)
-            load_models --code-fast --think
+            load_models --chat --code
+            ;;
+        2,5|5,2)
+            load_models --chat --think
             ;;
         3,4|4,3)
+            load_models --code-fast --code
+            ;;
+        3,5|5,3)
+            load_models --code-fast --think
+            ;;
+        4,5|5,4)
             load_models --code --think
             ;;
-        1,2,3|1,3,2|2,1,3|2,3,1|3,1,2|3,2,1)
-            load_models --chat --code-fast --code
-            ;;
-        1,2,4|1,4,2|2,1,4|2,4,1|4,1,2|4,2,1)
-            load_models --chat --code-fast --think
-            ;;
         1,3,4|1,4,3|3,1,4|3,4,1|4,1,3|4,3,1)
-            load_models --chat --code --think
+            load_models --chat-fast --code-fast --code
+            ;;
+        1,3,5|1,5,3|3,1,5|3,5,1|5,1,3|5,3,1)
+            load_models --chat-fast --code-fast --think
+            ;;
+        1,4,5|1,5,4|4,1,5|4,5,1|5,1,4|5,4,1)
+            load_models --chat-fast --code --think
             ;;
         2,3,4|2,4,3|3,2,4|3,4,2|4,2,3|4,3,2)
-            load_models --code-fast --code --think
+            load_models --chat --code-fast --code
             ;;
-        1,2,3,4|1,2,4,3|1,3,2,4|1,3,4,2|1,4,2,3|1,4,3,2|2,1,3,4|2,1,4,3|2,3,1,4|2,3,4,1|2,4,1,3|2,4,3,1|3,1,2,4|3,1,4,2|3,2,1,4|3,2,4,1|3,4,1,2|3,4,2,1|4,1,2,3|4,1,3,2|4,2,1,3|4,2,3,1|4,3,1,2|4,3,2,1)
+        2,3,5|2,5,3|3,2,5|3,5,2|5,2,3|5,3,2)
+            load_models --chat --code-fast --think
+            ;;
+        2,4,5|2,5,4|4,2,5|4,5,2|5,2,4|5,4,2)
+            load_models --chat --code --think
+            ;;
+        1,2,3,4,5|1,2,3,5,4|1,2,4,3,5|1,2,4,5,3|1,2,5,3,4|1,2,5,4,3|1,3,2,4,5|1,3,2,5,4|1,3,4,2,5|1,3,4,5,2|1,3,5,2,4|1,3,5,4,2|1,4,2,3,5|1,4,2,5,3|1,4,3,2,5|1,4,3,5,2|1,4,5,2,3|1,4,5,3,2|1,5,2,3,4|1,5,2,4,3|1,5,3,2,4|1,5,3,4,2|1,5,4,2,3|1,5,4,3,2|2,1,3,4,5|2,1,3,5,4|2,1,4,3,5|2,1,4,5,3|2,1,5,3,4|2,1,5,4,3|2,3,1,4,5|2,3,1,5,4|2,3,4,1,5|2,3,4,5,1|2,3,5,1,4|2,3,5,4,1|2,4,1,3,5|2,4,1,5,3|2,4,3,1,5|2,4,3,5,1|2,4,5,1,3|2,4,5,3,1|2,5,1,3,4|2,5,1,4,3|2,5,3,1,4|2,5,3,4,1|2,5,4,1,3|2,5,4,3,1|3,1,2,4,5|3,1,2,5,4|3,1,4,2,5|3,1,4,5,2|3,1,5,2,4|3,1,5,4,2|3,2,1,4,5|3,2,1,5,4|3,2,4,1,5|3,2,4,5,1|3,2,5,1,4|3,2,5,4,1|3,4,1,2,5|3,4,1,5,2|3,4,2,1,5|3,4,2,5,1|3,4,5,1,2|3,4,5,2,1|3,5,1,2,4|3,5,1,4,2|3,5,2,1,4|3,5,2,4,1|3,5,4,1,2|3,5,4,2,1|4,1,2,3,5|4,1,2,5,3|4,1,3,2,5|4,1,3,5,2|4,1,5,2,3|4,1,5,3,2|4,2,1,3,5|4,2,1,5,3|4,2,3,1,5|4,2,3,5,1|4,2,5,1,3|4,2,5,3,1|4,3,1,2,5|4,3,1,5,2|4,3,2,1,5|4,3,2,5,1|4,3,5,1,2|4,3,5,2,1|4,5,1,2,3|4,5,1,3,2|4,5,2,1,3|4,5,2,3,1|4,5,3,1,2|4,5,3,2,1|5,1,2,3,4|5,1,2,4,3|5,1,3,2,4|5,1,3,4,2|5,1,4,2,3|5,1,4,3,2|5,2,1,3,4|5,2,1,4,3|5,2,3,1,4|5,2,3,4,1|5,2,4,1,3|5,2,4,3,1|5,3,1,2,4|5,3,1,4,2|5,3,2,1,4|5,3,2,4,1|5,3,4,1,2|5,3,4,2,1)
             load_models --all
             ;;
         0)
@@ -212,19 +236,23 @@ show_help() {
     echo "Usage: $0 [options]"
     echo ""
     echo "Options:"
-    echo "  --chat          Load general chat model (Llama 3.1 70B)"
-    echo "  --code-fast     Load fast code model (Phi-4)"
-    echo "  --code          Load general code model (Qwen 2.5 Coder 32B)"
-    echo "  --think         Load reasoning model (DeepSeek R1)"
+    echo "  --chat-fast     Load fast chat model (Llama 3.1 8B, ~9 GB)"
+    echo "  --chat          Load deep chat model (Llama 3.1 70B, ~42 GB)"
+    echo "  --chat-deep     Same as --chat"
+    echo "  --code-fast     Load fast code model (Phi-4, ~16 GB)"
+    echo "  --code          Load general code model (Qwen 2.5 Coder 32B, ~35 GB)"
+    echo "  --think         Load reasoning model (DeepSeek R1, ~28 GB)"
     echo "  --all           Load all models"
     echo "  (no options)    Show interactive menu"
     echo "  --help          Show this help"
     echo ""
     echo "Examples:"
-    echo "  $0 --chat"
-    echo "  $0 --code --think"
-    echo "  $0 --code-fast --chat"
-    echo "  $0  # Interactive menu"
+    echo "  $0 --chat-fast              # Quick chat, low memory"
+    echo "  $0 --chat                   # Deep chat for complex conversations"
+    echo "  $0 --code --think           # Code + reasoning"
+    echo "  $0 --chat-fast --code-fast  # Lightweight combo (~25 GB)"
+    echo "  $0 --chat --code --think    # Full power combo (~105 GB, may swap)"
+    echo "  $0                          # Interactive menu"
     echo ""
 }
 
