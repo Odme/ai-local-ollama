@@ -8,6 +8,7 @@ services:
       - ollama_:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0  # ✅ Accesible desde fuera del container
+      - OLLAMA_MAX_VRAM=53687091200
     restart: unless-stopped
     # ✅ En Mac M4, Ollama ya usa Metal automáticamente dentro del container
 networks:

@@ -2,9 +2,8 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { prompt } from 'enquirer';
-import { execSync, spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { input } from '@inquirer/prompts';
+import { execSync } from 'child_process';
 
 // Configuration
 const CONTAINER_NAME = 'ai-models';
@@ -74,7 +73,7 @@ function checkContainer(): void {
       info('Start it with: docker-compose up -d');
       process.exit(1);
     }
-  } catch (err) {
+  } catch {
     error('Failed to check container status. Is Docker running?');
     process.exit(1);
   }
@@ -102,7 +101,7 @@ async function ensureModel(model: Model): Promise<void> {
         env: { ...process.env, FORCE_COLOR: '1' }
       });
       success(`${model.name} downloaded successfully`);
-    } catch (err) {
+    } catch {
       error(`Failed to download ${model.name}`);
       process.exit(1);
     }
@@ -138,7 +137,6 @@ async function loadModels(modelIds: string[]): Promise<void> {
     console.log(`   • ${m.name} - ${m.description} (~${m.vramGB} GB)`);
   });
 
-  // Warning if VRAM exceeds 64GB
   if (totalVRAM > 64) {
     console.log('');
     warning(`⚠️  Total VRAM (${totalVRAM} GB) exceeds your 64 GB. Models may swap to RAM.`);
@@ -163,9 +161,7 @@ async function showInteractiveMenu(): Promise<void> {
   console.log('');
 
   try {
-    const response = await prompt<{ selection: string }>({
-      type: 'input',
-      name: 'selection',
+    const selection = await input({
       message: 'Select (e.g., 1,3 or 2,4,5):',
       validate: (input: string) => {
         if (!input.trim()) return 'Please enter a selection';
@@ -175,7 +171,7 @@ async function showInteractiveMenu(): Promise<void> {
       },
     });
 
-    const selections = response.selection.split(',').map(s => parseInt(s.trim()));
+    const selections = selection.split(',').map(s => parseInt(s.trim()));
 
     if (selections.includes(0)) {
       info('Exiting...');
@@ -183,7 +179,6 @@ async function showInteractiveMenu(): Promise<void> {
     }
 
     if (selections.includes(modelList.length + 1)) {
-      // "All" selected
       await loadModels(modelList.map(m => m.id));
       return;
     }
