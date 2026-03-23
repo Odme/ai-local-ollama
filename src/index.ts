@@ -2,12 +2,14 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { input } from '@inquirer/prompts';
+import { input, confirm } from '@inquirer/prompts';
 import { execSync } from 'child_process';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { homedir } from 'os';
+import { join, dirname } from 'path';
 
 // Configuration
-const CONTAINER_NAME = 'ai-models';
-const OLLAMA_CMD = `docker exec ${CONTAINER_NAME} ollama`;
+const OLLAMA_CMD = process.env.OLLAMA_CMD || 'ollama';
 
 // Model definitions
 interface Model {
@@ -22,9 +24,9 @@ const MODELS: Record<string, Model> = {
   'chat-fast': {
     id: 'chat-fast',
     name: 'Fast Chat',
-    ollamaTag: 'llama3.1:8b-instruct-q8_0',
-    vramGB: 9,
-    description: 'Llama 3.1 8B - Quick conversations',
+    ollamaTag: 'llama3.2:3b',
+    vramGB: 2,
+    description: 'Llama 3.2 3B - Quick conversations',
   },
   'chat-deep': {
     id: 'chat-deep',
@@ -43,15 +45,15 @@ const MODELS: Record<string, Model> = {
   'code-general': {
     id: 'code-general',
     name: 'General Code',
-    ollamaTag: 'qwen2.5-coder:32b-q6_K',
-    vramGB: 35,
+    ollamaTag: 'qwen2.5-coder:32b',
+    vramGB: 20,
     description: 'Qwen 2.5 Coder 32B - Serious development',
   },
   'think': {
     id: 'think',
     name: 'Reasoning',
     ollamaTag: 'deepseek-r1:32b',
-    vramGB: 28,
+    vramGB: 20,
     description: 'DeepSeek R1 - Complex reasoning',
   },
 };
@@ -63,18 +65,22 @@ const warning = (msg: string) => console.log(chalk.yellow('⚠️  ') + msg);
 const error = (msg: string) => console.log(chalk.red('❌ ') + msg);
 
 // Utility functions
-function checkContainer(): void {
+function getDownloadedModels(): string[] {
   try {
-    const output = execSync('docker ps --format "{{.Names}}"', { encoding: 'utf-8' });
-    const containers = output.trim().split('\n');
-
-    if (!containers.includes(CONTAINER_NAME)) {
-      error(`Container '${CONTAINER_NAME}' is not running.`);
-      info('Start it with: docker-compose up -d');
-      process.exit(1);
-    }
+    const output = execSync(`${OLLAMA_CMD} list`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] });
+    const lines = output.trim().split('\n').slice(1);
+    return lines.map(line => line.trim().split(/\s+/)[0]).filter(Boolean);
   } catch {
-    error('Failed to check container status. Is Docker running?');
+    return [];
+  }
+}
+
+function checkOllama(): void {
+  try {
+    execSync(`${OLLAMA_CMD} list`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] });
+  } catch {
+    error('Ollama is not running or not installed.');
+    info('Install from: https://ollama.com');
     process.exit(1);
   }
 }
@@ -96,7 +102,7 @@ async function ensureModel(model: Model): Promise<void> {
     info(`Model: ${model.ollamaTag}`);
 
     try {
-      execSync(`docker exec ${CONTAINER_NAME} ollama pull ${model.ollamaTag}`, {
+      execSync(`${OLLAMA_CMD} pull ${model.ollamaTag}`, {
         stdio: 'inherit',
         env: { ...process.env, FORCE_COLOR: '1' }
       });
@@ -130,7 +136,7 @@ async function loadModels(modelIds: string[]): Promise<void> {
   success('Models ready to use');
   console.log('');
   info('You can use them with:');
-  console.log(`   docker exec -it ${CONTAINER_NAME} ollama run <model-name>`);
+  console.log(`   ollama run <model-name>`);
   console.log('');
   info(`Loaded models (${totalVRAM} GB total):`);
   modelsToLoad.forEach(m => {
@@ -141,12 +147,44 @@ async function loadModels(modelIds: string[]): Promise<void> {
     console.log('');
     warning(`⚠️  Total VRAM (${totalVRAM} GB) exceeds your 64 GB. Models may swap to RAM.`);
   }
+
+  const configPath = join(homedir(), '.config', 'opencode', 'opencode.json');
+  const shouldConfigure = await confirm({
+    message: 'Configure opencode to use these models?',
+    default: true,
+  });
+
+  if (shouldConfigure) {
+    const modelsConfig: Record<string, { name: string }> = {};
+    for (const m of modelsToLoad) {
+      modelsConfig[m.ollamaTag] = { name: `${m.name} (local)` };
+    }
+
+    const config = {
+      $schema: 'https://opencode.ai/config.json',
+      provider: {
+        ollama: {
+          npm: '@ai-sdk/openai-compatible',
+          name: 'Ollama (local)',
+          options: {
+            baseURL: 'http://localhost:11434/v1',
+          },
+          models: modelsConfig,
+        },
+      },
+    };
+
+    writeFileSync(configPath, JSON.stringify(config, null, 2));
+    success(`opencode config written to ${configPath}`);
+    console.log('');
+    info('Restart opencode and use /models to select your local models');
+  }
 }
 
 async function showInteractiveMenu(): Promise<void> {
   console.log('');
   console.log(chalk.blue('╔════════════════════════════════════════════╗'));
-  console.log(chalk.blue('║   🤖  Select models to load               ║'));
+  console.log(chalk.blue('║   🤖  Select models to load                ║'));
   console.log(chalk.blue('╚════════════════════════════════════════════╝'));
   console.log('');
   console.log('Available options (select multiple with comma):');
@@ -206,22 +244,22 @@ program
   .name('ai-local')
   .description('Load Ollama models based on your workflow')
   .version('1.0.0')
-  .option('--chat-fast', 'Load fast chat model (Llama 3.1 8B)')
-  .option('--chat, --chat-deep', 'Load deep chat model (Llama 3.1 70B)')
+  .option('--chat-fast', 'Load fast chat model (Llama 3.2 3B)')
+  .option('--chat-deep', 'Load deep chat model (Llama 3.1 70B)')
   .option('--code-fast', 'Load fast code model (Phi-4)')
-  .option('--code, --code-general', 'Load general code model (Qwen 2.5 Coder 32B)')
-  .option('--think, --reasoning', 'Load reasoning model (DeepSeek R1)')
+  .option('--code-general', 'Load general code model (Qwen 2.5 Coder 32B)')
+  .option('--think', 'Load reasoning model (DeepSeek R1)')
   .option('--all', 'Load all models')
   .action(async (options) => {
-    checkContainer();
+    checkOllama();
 
     const modelIds: string[] = [];
 
     if (options.chatFast) modelIds.push('chat-fast');
-    if (options.chat || options.chatDeep) modelIds.push('chat-deep');
+    if (options.chatDeep) modelIds.push('chat-deep');
     if (options.codeFast) modelIds.push('code-fast');
-    if (options.code || options.codeGeneral) modelIds.push('code-general');
-    if (options.think || options.reasoning) modelIds.push('think');
+    if (options.codeGeneral) modelIds.push('code-general');
+    if (options.think) modelIds.push('think');
     if (options.all) {
       modelIds.push(...Object.keys(MODELS));
     }
