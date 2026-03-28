@@ -4,9 +4,9 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { input, confirm } from '@inquirer/prompts';
 import { execSync } from 'child_process';
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { homedir } from 'os';
-import { join, dirname } from 'path';
+import { join } from 'path';
 
 // Configuration
 const OLLAMA_CMD = process.env.OLLAMA_CMD || 'ollama';
